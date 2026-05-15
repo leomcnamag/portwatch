@@ -38,6 +38,12 @@ Stop the daemon at any time:
 portwatch stop
 ```
 
+Check daemon status:
+
+```bash
+portwatch status
+```
+
 ### CLI Options
 
 | Flag | Description |
