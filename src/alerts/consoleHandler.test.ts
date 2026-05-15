@@ -65,4 +65,12 @@ describe('createConsoleHandler', () => {
     handler(makeAlert({ severity: 'info' }));
     expect(logSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('includes port and process info in output', () => {
+    const handler = createConsoleHandler({ minSeverity: 'info', useColor: false });
+    handler(makeAlert({ severity: 'info' }));
+    const output: string = logSpy.mock.calls[0][0];
+    expect(output).toContain('80');
+    expect(output).toContain('nginx');
+  });
 });
