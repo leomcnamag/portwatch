@@ -1,43 +1,37 @@
-import { PortWatchConfig } from './configLoader';
+import { PortwatchConfig } from "./configLoader";
+import { applyThrottleDefaults } from "../throttle/throttleConfig";
 
-export const DEFAULT_SCAN_INTERVAL_MS = 5000;
-export const DEFAULT_ALERT_COOLDOWN_MS = 60000;
-export const DEFAULT_LOG_FILE = '/var/log/portwatch/alerts.log';
-export const DEFAULT_TRUSTED_PORTS: number[] = [22, 80, 443];
-export const DEFAULT_TRUSTED_PROCESSES: string[] = ['sshd', 'nginx', 'httpd', 'node'];
-
-export const CONFIG_DEFAULTS: Required<PortWatchConfig> = {
-  scanIntervalMs: DEFAULT_SCAN_INTERVAL_MS,
-  alertCooldownMs: DEFAULT_ALERT_COOLDOWN_MS,
-  logFile: DEFAULT_LOG_FILE,
-  trustedPorts: DEFAULT_TRUSTED_PORTS,
-  trustedProcesses: DEFAULT_TRUSTED_PROCESSES,
-  enableConsole: true,
-  enableFile: false,
+const DEFAULTS: Partial<PortwatchConfig> = {
+  scanIntervalMs: 5_000,
+  ignorePorts: [],
+  ignoreProcesses: [],
+  whitelist: [],
+  alertSeverityThreshold: "low",
 };
 
-/**
- * Merges a partial user config with the defaults, ensuring all required
- * fields are present and that array fields are deduplicated.
- */
-export function applyDefaults(partial: Partial<PortWatchConfig>): Required<PortWatchConfig> {
-  const merged: Required<PortWatchConfig> = {
-    ...CONFIG_DEFAULTS,
-    ...partial,
-  };
+export function applyDefaults(config: Partial<PortwatchConfig>): PortwatchConfig {
+  const merged: PortwatchConfig = {
+    ...DEFAULTS,
+    ...config,
+  } as PortwatchConfig;
 
-  // Merge and deduplicate array fields rather than replacing them
-  if (partial.trustedPorts) {
-    merged.trustedPorts = Array.from(
-      new Set([...CONFIG_DEFAULTS.trustedPorts, ...partial.trustedPorts])
-    );
+  if (!merged.scanIntervalMs || merged.scanIntervalMs <= 0) {
+    merged.scanIntervalMs = DEFAULTS.scanIntervalMs!;
   }
 
-  if (partial.trustedProcesses) {
-    merged.trustedProcesses = Array.from(
-      new Set([...CONFIG_DEFAULTS.trustedProcesses, ...partial.trustedProcesses])
-    );
+  if (!Array.isArray(merged.ignorePorts)) {
+    merged.ignorePorts = [];
   }
+
+  if (!Array.isArray(merged.ignoreProcesses)) {
+    merged.ignoreProcesses = [];
+  }
+
+  if (!Array.isArray(merged.whitelist)) {
+    merged.whitelist = [];
+  }
+
+  merged.throttle = applyThrottleDefaults(config.throttle ?? undefined);
 
   return merged;
 }
