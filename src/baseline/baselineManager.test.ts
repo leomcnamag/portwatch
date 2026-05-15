@@ -1,64 +1,50 @@
 import { createBaselineManager } from './baselineManager';
-import { PortBinding } from '../scanner/portScanner';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import type { PortBinding } from '../scanner/portScanner';
 
 function makeBinding(overrides: Partial<PortBinding> = {}): PortBinding {
   return {
-    port: 8080,
+    port: 3000,
     protocol: 'tcp',
-    process: 'nginx',
-    pid: 42,
+    pid: 1234,
+    process: 'node',
     address: '127.0.0.1',
     ...overrides,
   };
 }
 
-describe('baselineManager', () => {
-  it('learns bindings and reports size', () => {
-    const mgr = createBaselineManager();
-    mgr.learn([makeBinding({ port: 80 }), makeBinding({ port: 443 })]);
-    expect(mgr.size()).toBe(2);
+describe('createBaselineManager', () => {
+  it('starts with an empty baseline', () => {
+    const manager = createBaselineManager();
+    expect(manager.has(makeBinding())).toBe(false);
   });
 
-  it('identifies known bindings', () => {
-    const mgr = createBaselineManager();
-    const b = makeBinding();
-    mgr.learn([b]);
-    expect(mgr.isKnown(b)).toBe(true);
+  it('adds a binding and detects it', () => {
+    const manager = createBaselineManager();
+    manager.add(makeBinding({ port: 8080 }));
+    expect(manager.has(makeBinding({ port: 8080 }))).toBe(true);
   });
 
-  it('filters out unknown bindings', () => {
-    const mgr = createBaselineManager();
-    mgr.learn([makeBinding({ port: 80 })]);
-    const result = mgr.filterUnknown([
-      makeBinding({ port: 80 }),
-      makeBinding({ port: 9000 }),
-    ]);
-    expect(result).toHaveLength(1);
-    expect(result[0].port).toBe(9000);
+  it('removes a binding', () => {
+    const manager = createBaselineManager();
+    manager.add(makeBinding({ port: 8080 }));
+    manager.remove(makeBinding({ port: 8080 }));
+    expect(manager.has(makeBinding({ port: 8080 }))).toBe(false);
   });
 
-  it('resets the store', () => {
-    const mgr = createBaselineManager();
-    mgr.learn([makeBinding()]);
-    mgr.reset();
-    expect(mgr.size()).toBe(0);
+  it('promotes a snapshot to baseline', () => {
+    const manager = createBaselineManager();
+    const bindings = [makeBinding({ port: 3000 }), makeBinding({ port: 4000 })];
+    manager.promoteSnapshot(bindings);
+    expect(manager.has(makeBinding({ port: 3000 }))).toBe(true);
+    expect(manager.has(makeBinding({ port: 4000 }))).toBe(true);
   });
 
-  it('saves and loads baseline from file', async () => {
-    const mgr = createBaselineManager();
-    mgr.learn([makeBinding({ port: 3306, process: 'mysqld' })]);
-
-    const tmpFile = path.join(os.tmpdir(), `portwatch-baseline-${Date.now()}.json`);
-    await mgr.save(tmpFile);
-
-    const mgr2 = createBaselineManager();
-    await mgr2.load(tmpFile);
-    expect(mgr2.size()).toBe(1);
-    expect(mgr2.isKnown(makeBinding({ port: 3306, process: 'mysqld' }))).toBe(true);
-
-    await fs.promises.unlink(tmpFile);
+  it('serializes and restores state', () => {
+    const manager = createBaselineManager();
+    manager.add(makeBinding({ port: 9000 }));
+    const serialized = manager.serialize();
+    const restored = createBaselineManager();
+    restored.restore(serialized);
+    expect(restored.has(makeBinding({ port: 9000 }))).toBe(true);
   });
 });
